@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
+#include <complex.h>
 
 // to generate more cycle, increase cycle number
 // then duplicate the input based on cycle number
@@ -9,6 +11,7 @@
 
 #define CYCLE 1
 #define DATA_LENGTH 20
+#define NUM_HARMONICS 5
 
 float Va[] = {
     156.63, 246.59, 294.72, 305.51, 300.66,
@@ -38,6 +41,7 @@ typedef struct _DDATA{
     float *F_est;
     float *Theta_est;
     float *Harmonics;
+    float THD;
     float Ts;
     float Kc1; // Kc are controller gains
     float Kc2; // choose your controller and
@@ -45,9 +49,10 @@ typedef struct _DDATA{
 }DDATA;
 
 DDATA ddata = {
-    .in_a = &Va,
-    .in_b = &Vb,
-    .in_c = &Vc,
+    // Removed incorrect pointer dererence since array name itself points to its first element
+    .in_a = Va,
+    .in_b = Vb,
+    .in_c = Vc,
     .Ts = 0.001,
 };
 
@@ -63,12 +68,59 @@ void estimateFrequencyAndTheta(DDATA *d, int dataSize){
 }
 
 // Function getHarmonicAmplitudes calculates the amplitudes of the 1st to 5th
-// The output should consist of 5 data points, each representing the amplitud
-// Additionally, you can use these 5 data points to calculate the Total Harmo
-void getHarmonicAmplitudes(DDATA *d, int dataSize){
-    // Implementation for getting harmonic amplitudes
+// The output should consist of 5 data points, each representing the amplitude
+// Additionally, you can use these 5 data points to calculate the Total Harmonic Distortion
+void getHarmonicAmplitudes(DDATA *d, int dataSize) {
+    float *HarmonicsA = (float *)malloc(NUM_HARMONICS * sizeof(float));
+    float *HarmonicsB = (float *)malloc(NUM_HARMONICS * sizeof(float));
+    float *HarmonicsC = (float *)malloc(NUM_HARMONICS * sizeof(float));
+    d->Harmonics = (float *)malloc(NUM_HARMONICS * sizeof(float));
+    float complex sumA[NUM_HARMONICS] = {0};
+    float complex sumB[NUM_HARMONICS] = {0};
+    float complex sumC[NUM_HARMONICS] = {0};
 
+    // Unrolled DFT calculation and harmonic amplitude for each phase
+    for (int k = 0; k < NUM_HARMONICS; k++) {
+        for (int i = 0; i < dataSize; i++) {
+
+            // Discrete Fourier transform
+            // t as current time in the sample sequence
+            float t = i * d->Ts;
+            // Calculates the phase angle for the k-th harmonic at time t in radians (converted by 2*pi term).
+            float complex exp_term = cexp(-I * 2 * M_PI * (k + 1) * t / (dataSize * d->Ts));
+            // Correlating the input signal with the complex sinusoid for each phase
+            sumA[k] += d->in_a[i] * exp_term;
+            sumB[k] += d->in_b[i] * exp_term;
+            sumC[k] += d->in_c[i] * exp_term;
+        }
+
+        // k-th harmonic amplitude by absolute value complex magnitude of DFT coefficient
+        // by a factor of 2 to account for energy is split between positive and negative frequencies
+        // normalized over dataSize
+        HarmonicsA[k] = cabs(sumA[k]) * 2 / dataSize;
+        HarmonicsB[k] = cabs(sumB[k]) * 2 / dataSize;
+        HarmonicsC[k] = cabs(sumC[k]) * 2 / dataSize;
+
+        // Take the average harmonic amplitude of each phase to represent for overall three-phase
+        d->Harmonics[k] = (HarmonicsA[k] + HarmonicsB[k] + HarmonicsC[k])/3;
+    }
+
+    // Calculate Total Harmonic Distortion (THD) as the ratio of the sum of amplitude of all
+    // harmonic components to the amplitude of the fundamental frequency
+    float fundamental = ddata.Harmonics[0];
+    float sum_squares = 0;
+    for (int i = 1; i < NUM_HARMONICS; i++) {
+        sum_squares += ddata.Harmonics[i] * ddata.Harmonics[i];
+    }
+
+    d->THD = 100 * sqrt(sum_squares) / fundamental;
+
+    // Free intermediate values not necessary for later use
+    free(HarmonicsA);
+    free(HarmonicsB);
+    free(HarmonicsC);
 }
+
 int main()
 {
     int i = 0;
@@ -79,6 +131,15 @@ int main()
     }
 
     getHarmonicAmplitudes(&ddata, DATA_LENGTH * CYCLE);
+
+    printf("Fundamental Amplitude: %.2f\n", ddata.Harmonics[i]);
+    for (int i = 1; i < NUM_HARMONICS; i++) {
+        printf("Harmonic %d: %.2f\n", i + 1, ddata.Harmonics[i]);
+    }
+
+    printf("Total Harmonic Distortion (THD): %.2f%%\n", ddata.THD);
+
+    free(ddata.Harmonics);
 
     return 0;
 }
