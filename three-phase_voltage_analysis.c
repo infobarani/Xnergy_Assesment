@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
 // to generate more cycle, increase cycle number
 // then duplicate the input based on cycle number
@@ -9,6 +10,7 @@
 
 #define CYCLE 1
 #define DATA_LENGTH 20
+#define PI 3.14159265359
 
 float Va[] = {
     156.63, 246.59, 294.72, 305.51, 300.66,
@@ -45,9 +47,10 @@ typedef struct _DDATA{
 }DDATA;
 
 DDATA ddata = {
-    .in_a = &Va,
-    .in_b = &Vb,
-    .in_c = &Vc,
+    // Removed incorrect pointer dererence since array name itself points to its first element
+    .in_a = Va,
+    .in_b = Vb,
+    .in_c = Vc,
     .Ts = 0.001,
 };
 
@@ -58,8 +61,39 @@ DDATA ddata = {
 // Thus, the size of the Estimated Theta and Freq arrays
 // should match the input data size (DATALENGTH * CYCLE)
 void estimateFrequencyAndTheta(DDATA *d, int dataSize){
-    // Implementation for estimating frequency and theta
 
+    // Use dynamic allocation for F_est & Theta_est then depending on actual target
+    // consider posibility of using static allocation
+    d->F_est = (float *)malloc(dataSize * sizeof(float));
+    d->Theta_est = (float *)malloc(dataSize * sizeof(float));
+
+    float alpha, beta;
+
+    for (int i = 0; i < dataSize; i++) {
+
+        // Using Clarke transformation to get alpha and beta using values a, b & c values
+        alpha = (2.0/3.0) * (d->in_a[i] - 0.5 * (d->in_b[i] + d->in_c[i]));
+        beta = (2.0/3.0) * ((sqrt(3)/2.0) * (d->in_b[i] - d->in_c[i]));
+
+        // Calculate phase angle using atan2(beta, alpha)
+        d->Theta_est[i] = atan2(beta, alpha);
+
+        // Unwrap phase angles to ensure continuity
+        if (i == 0){
+          // First sample keep as it is, no Unwrap needed
+        } else if (d->Theta_est[i] - d->Theta_est[i - 1] > PI) {
+            d->Theta_est[i] -= 2 * PI;
+        } else if (d->Theta_est[i] - d->Theta_est[i - 1] < -PI) {
+            d->Theta_est[i] += 2 * PI;
+        }
+
+        if (i > 0){
+            // Estimate frequency as dTheta/dt
+            d->F_est[i] = (d->Theta_est[i] - d->Theta_est[i - 1]) / (2.0 * PI * d->Ts);
+        } else{
+            d->F_est[i] = 0;
+        }
+    }
 }
 
 // Function getHarmonicAmplitudes calculates the amplitudes of the 1st to 5th
@@ -73,12 +107,26 @@ int main()
 {
     int i = 0;
 
-    for(i = 0; i < DATA_LENGTH * CYCLE; i++)
+    // for(i = 0; i < DATA_LENGTH * CYCLE; i++)
     {
+        // Removed outside iteration since estimateFrequencyAndTheta itself iterates all sample points 
         estimateFrequencyAndTheta(&ddata, DATA_LENGTH * CYCLE);
     }
 
+    // Print the Estimated Frequency by getting the last estimate value
+    printf("Estimated Frequency (Hz): %.2f\n\n", ddata.F_est[(DATA_LENGTH * CYCLE)-1]);
+
+    // Print the Estimated Phase angle over time
+    printf("Estimated Phase angle (radians):\n");
+    for (int i = 0; i < DATA_LENGTH * CYCLE; i++) {
+        printf("%.2f, ", ddata.Theta_est[i]);
+    }
+
     getHarmonicAmplitudes(&ddata, DATA_LENGTH * CYCLE);
+
+    // Free allocated memory for F_est & Theta_est
+    free(ddata.F_est);
+    free(ddata.Theta_est);
 
     return 0;
 }
