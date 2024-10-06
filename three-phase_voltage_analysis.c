@@ -182,11 +182,10 @@ int main()
 
     printf("Total Harmonic Distortion (THD): %.2f%%\n", ddata.THD);
 
-    free(ddata.Harmonics);
-
-    // Free allocated memory for F_est & Theta_est
+    // Free allocated memory for F_est, Theta_est & Harmonics
     free(ddata.F_est);
     free(ddata.Theta_est);
-
+    free(ddata.Harmonics);
+    
     return 0;
 }
