@@ -12,7 +12,6 @@
 
 #define CYCLE 1
 #define DATA_LENGTH 20
-#define PI 3.14159265359
 #define NUM_HARMONICS 5
 
 float Va[] = {
@@ -85,15 +84,15 @@ void estimateFrequencyAndTheta(DDATA *d, int dataSize){
         // Unwrap phase angles to ensure continuity
         if (i == 0){
           // First sample keep as it is, no Unwrap needed
-        } else if (d->Theta_est[i] - d->Theta_est[i - 1] > PI) {
-            d->Theta_est[i] -= 2 * PI;
-        } else if (d->Theta_est[i] - d->Theta_est[i - 1] < -PI) {
-            d->Theta_est[i] += 2 * PI;
+        } else if (d->Theta_est[i] - d->Theta_est[i - 1] > M_PI) {
+            d->Theta_est[i] -= 2 * M_PI;
+        } else if (d->Theta_est[i] - d->Theta_est[i - 1] < -M_PI) {
+            d->Theta_est[i] += 2 * M_PI;
         }
 
         if (i > 0){
             // Estimate frequency as dTheta/dt
-            d->F_est[i] = (d->Theta_est[i] - d->Theta_est[i - 1]) / (2.0 * PI * d->Ts);
+            d->F_est[i] = (d->Theta_est[i] - d->Theta_est[i - 1]) / (2.0 * M_PI * d->Ts);
         } else{
             d->F_est[i] = 0;
         }
@@ -186,6 +185,6 @@ int main()
     free(ddata.F_est);
     free(ddata.Theta_est);
     free(ddata.Harmonics);
-    
+
     return 0;
 }
