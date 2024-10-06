@@ -1,0 +1,5 @@
+# Untrack vscode files
+.vscode
+
+# Untrack executable binary
+*.exe
