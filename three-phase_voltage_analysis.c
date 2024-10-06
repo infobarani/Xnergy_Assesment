@@ -174,7 +174,7 @@ int main()
 
     getHarmonicAmplitudes(&ddata, DATA_LENGTH * CYCLE);
 
-    printf("Fundamental Amplitude: %.2f\n", ddata.Harmonics[i]);
+    printf("\n\nFundamental Amplitude: %.2f\n", ddata.Harmonics[i]);
     for (int i = 1; i < NUM_HARMONICS; i++) {
         printf("Harmonic %d: %.2f\n", i + 1, ddata.Harmonics[i]);
     }
